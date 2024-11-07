@@ -1,4 +1,4 @@
-#include <Ticker.h>
+#include <ESP32Ticker.h>
 
 // Timer event
 Ticker tickerInternal;

@@ -1,4 +1,4 @@
-#include <Ticker.h>
+#include <ESP32Ticker.h>
 #include <Wire.h>
 #include <SparkFunBME280.h>
 
