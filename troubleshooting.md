@@ -15,6 +15,12 @@ $ docker compose logs mariadb       # そのコンテナのログ（mosquitto / 
 $ docker compose logs -f grafana    # 流し続ける（Ctrl+C で抜ける）
 ```
 
+MQTT のメッセージが届いているかは，次のコマンドで確認できます．
+
+```shell
+$ docker compose exec mosquitto mosquitto_sub -t 'iot/#' -v
+```
+
 ## Docker
 
 |症状|原因と対処|
