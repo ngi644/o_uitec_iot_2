@@ -1,0 +1,272 @@
+[
+  {
+    "id": "db_tab",
+    "type": "tab",
+    "label": "データベースへの保存",
+    "disabled": false,
+    "info": "MQTTで届いたセンサの値と接続状態を MariaDB に保存します（応用編 s05）．"
+  },
+  {
+    "id": "c_db1",
+    "type": "comment",
+    "z": "db_tab",
+    "name": "センサの値を sensor_data テーブルに保存",
+    "info": "",
+    "x": 200,
+    "y": 40,
+    "wires": []
+  },
+  {
+    "id": "db_in_bme",
+    "type": "mqtt in",
+    "z": "db_tab",
+    "name": "",
+    "topic": "iot/esp01/bme",
+    "qos": "0",
+    "datatype": "json",
+    "broker": "mqtt_broker_cfg",
+    "nl": false,
+    "rap": true,
+    "rh": 0,
+    "inputs": 0,
+    "x": 150,
+    "y": 100,
+    "wires": [
+      [
+        "db_fn_insert"
+      ]
+    ]
+  },
+  {
+    "id": "db_fn_insert",
+    "type": "function",
+    "z": "db_tab",
+    "name": "INSERT文を作る",
+    "func": "// 届いたデータ例: {\"temp\":24.5, \"humid\":40.1, \"press\":1012.3}\nconst d = msg.payload;\nif (typeof d !== \"object\" || typeof d.temp !== \"number\") {\n    return null;   // 形がおかしいデータは保存しない\n}\n// トピック iot/<デバイスID>/bme からデバイスIDを取り出す\nconst device = msg.topic.split(\"/\")[1];\n\n// ? の部分に，msg.payload の配列の値が順に入る（SQLインジェクション対策）\nmsg.topic = \"INSERT INTO sensor_data (device, temp, humid, press) VALUES (?, ?, ?, ?)\";\nmsg.payload = [device, d.temp, d.humid ?? null, d.press ?? null];\nreturn msg;",
+    "outputs": 1,
+    "timeout": 0,
+    "noerr": 0,
+    "initialize": "",
+    "finalize": "",
+    "libs": [],
+    "x": 380,
+    "y": 100,
+    "wires": [
+      [
+        "db_mysql"
+      ]
+    ]
+  },
+  {
+    "id": "db_mysql",
+    "type": "mysql",
+    "z": "db_tab",
+    "mydb": "mariadb_cfg",
+    "name": "MariaDB",
+    "x": 600,
+    "y": 100,
+    "wires": [
+      [
+        "db_dbg"
+      ]
+    ]
+  },
+  {
+    "id": "db_dbg",
+    "type": "debug",
+    "z": "db_tab",
+    "name": "保存の結果",
+    "active": false,
+    "tosidebar": true,
+    "console": false,
+    "tostatus": true,
+    "complete": "payload.affectedRows",
+    "targetType": "msg",
+    "statusVal": "payload.insertId",
+    "statusType": "msg",
+    "x": 800,
+    "y": 100,
+    "wires": []
+  },
+  {
+    "id": "c_db2",
+    "type": "comment",
+    "z": "db_tab",
+    "name": "接続状態（online / offline）を device_event テーブルに保存",
+    "info": "",
+    "x": 240,
+    "y": 180,
+    "wires": []
+  },
+  {
+    "id": "db_in_conn",
+    "type": "mqtt in",
+    "z": "db_tab",
+    "name": "",
+    "topic": "iot/esp01/connection",
+    "qos": "0",
+    "datatype": "utf8",
+    "broker": "mqtt_broker_cfg",
+    "nl": false,
+    "rap": true,
+    "rh": 0,
+    "inputs": 0,
+    "x": 170,
+    "y": 240,
+    "wires": [
+      [
+        "db_fn_event"
+      ]
+    ]
+  },
+  {
+    "id": "db_fn_event",
+    "type": "function",
+    "z": "db_tab",
+    "name": "INSERT文を作る",
+    "func": "// Retain付きのメッセージは，Node-RED の再接続のたびに届くので保存しない\nif (msg.retain) {\n    return null;\n}\nconst device = msg.topic.split(\"/\")[1];\nmsg.topic = \"INSERT INTO device_event (device, state) VALUES (?, ?)\";\nmsg.payload = [device, String(msg.payload)];\nreturn msg;",
+    "outputs": 1,
+    "timeout": 0,
+    "noerr": 0,
+    "initialize": "",
+    "finalize": "",
+    "libs": [],
+    "x": 400,
+    "y": 240,
+    "wires": [
+      [
+        "db_mysql"
+      ]
+    ]
+  },
+  {
+    "id": "c_db3",
+    "type": "comment",
+    "z": "db_tab",
+    "name": "SQLを試す（ボタンを押すとデバッグ欄に結果が出る）",
+    "info": "",
+    "x": 230,
+    "y": 320,
+    "wires": []
+  },
+  {
+    "id": "db_inj_latest",
+    "type": "inject",
+    "z": "db_tab",
+    "name": "最新の5件",
+    "props": [
+      {
+        "p": "topic",
+        "vt": "str"
+      }
+    ],
+    "repeat": "",
+    "crontab": "",
+    "once": false,
+    "onceDelay": 0.1,
+    "topic": "SELECT id, CONVERT_TZ(ts, '+00:00', '+09:00') AS jst, device, temp, humid, press FROM sensor_data ORDER BY id DESC LIMIT 5",
+    "x": 150,
+    "y": 380,
+    "wires": [
+      [
+        "db_mysql_q"
+      ]
+    ]
+  },
+  {
+    "id": "db_inj_avg",
+    "type": "inject",
+    "z": "db_tab",
+    "name": "直近10分の平均",
+    "props": [
+      {
+        "p": "topic",
+        "vt": "str"
+      }
+    ],
+    "repeat": "",
+    "crontab": "",
+    "once": false,
+    "onceDelay": 0.1,
+    "topic": "SELECT device, COUNT(*) AS n, ROUND(AVG(temp),2) AS avg_temp, ROUND(MIN(temp),2) AS min_temp, ROUND(MAX(temp),2) AS max_temp FROM sensor_data WHERE ts >= NOW() - INTERVAL 10 MINUTE GROUP BY device",
+    "x": 160,
+    "y": 420,
+    "wires": [
+      [
+        "db_mysql_q"
+      ]
+    ]
+  },
+  {
+    "id": "db_mysql_q",
+    "type": "mysql",
+    "z": "db_tab",
+    "mydb": "mariadb_cfg",
+    "name": "MariaDB",
+    "x": 400,
+    "y": 400,
+    "wires": [
+      [
+        "db_dbg_q"
+      ]
+    ]
+  },
+  {
+    "id": "db_dbg_q",
+    "type": "debug",
+    "z": "db_tab",
+    "name": "SQLの結果",
+    "active": true,
+    "tosidebar": true,
+    "console": false,
+    "tostatus": false,
+    "complete": "payload",
+    "targetType": "msg",
+    "statusVal": "",
+    "statusType": "auto",
+    "x": 600,
+    "y": 400,
+    "wires": []
+  },
+  {
+    "id": "mqtt_broker_cfg",
+    "type": "mqtt-broker",
+    "name": "localhost",
+    "broker": "localhost",
+    "port": "1883",
+    "clientid": "",
+    "autoConnect": true,
+    "usetls": false,
+    "protocolVersion": "4",
+    "keepalive": "60",
+    "cleansession": true,
+    "autoUnsubscribe": true,
+    "birthTopic": "",
+    "birthQos": "0",
+    "birthRetain": "false",
+    "birthPayload": "",
+    "birthMsg": {},
+    "closeTopic": "",
+    "closeQos": "0",
+    "closeRetain": "false",
+    "closePayload": "",
+    "closeMsg": {},
+    "willTopic": "",
+    "willQos": "0",
+    "willRetain": "false",
+    "willPayload": "",
+    "willMsg": {},
+    "userProps": "",
+    "sessionExpiry": ""
+  },
+  {
+    "id": "mariadb_cfg",
+    "type": "MySQLdatabase",
+    "name": "MariaDB (iot)",
+    "host": "localhost",
+    "port": "3306",
+    "db": "iot",
+    "tz": "",
+    "charset": "UTF8"
+  }
+]

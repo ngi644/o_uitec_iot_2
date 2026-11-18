@@ -1,0 +1,12 @@
+# grafana/dashboards フォルダにある JSON を，ダッシュボードとして自動で読み込みます．
+apiVersion: 1
+
+providers:
+  - name: iot
+    folder: IoT演習
+    type: file
+    disableDeletion: true
+    # 画面上での編集を許可（保存した変更は Grafana の中に残ります．JSON ファイルは変わりません）
+    allowUiUpdates: true
+    options:
+      path: /etc/grafana/dashboards

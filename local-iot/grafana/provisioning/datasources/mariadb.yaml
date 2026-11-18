@@ -1,0 +1,19 @@
+# Grafana の起動時に，データソース（MariaDB への接続）を自動で登録します．
+apiVersion: 1
+
+datasources:
+  - name: MariaDB (iot)
+    uid: iot-mariadb
+    type: mysql
+    url: mariadb:3306
+    user: grafana
+    isDefault: true
+    editable: false
+    jsonData:
+      database: iot
+      maxOpenConns: 10
+      maxIdleConns: 10
+      connMaxLifetime: 14400
+    secureJsonData:
+      # compose.yaml で .env から渡された値が入ります
+      password: ${DB_READER_PASSWORD}
