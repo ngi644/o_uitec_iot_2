@@ -1,0 +1,16 @@
+# アラートの通知先（連絡先）を自動で登録します．
+# 「Node-RED（LED）」を選んだアラートは，Node-RED の /grafana-alert に JSON で送られ，
+# Node-RED が MQTT で ESP32 の LED を点滅させます（s07）．
+apiVersion: 1
+
+contactPoints:
+  - orgId: 1
+    name: Node-RED（LED）
+    receivers:
+      - uid: node-red-led
+        type: webhook
+        settings:
+          # compose.yaml で .env から渡された値が入ります
+          url: ${ALERT_WEBHOOK_URL}
+          httpMethod: POST
+        disableResolveMessage: false

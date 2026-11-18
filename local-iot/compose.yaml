@@ -1,0 +1,86 @@
+# ローカルIoT基盤（MQTTブローカ + データベース + 可視化）
+#
+#   Raspberry Pi でも QNAP NAS（Container Station）でも，このファイルをそのまま使います．
+#   パスワードなどの設定は，同じフォルダの .env に書きます（.env.example をコピーして作る）．
+#
+#   起動:  docker compose up -d
+#   状態:  docker compose ps
+#   ログ:  docker compose logs -f grafana
+#   停止:  docker compose down        （データはボリュームに残ります）
+#
+#   画面:  Grafana  http://<このマシンのIP>:3000
+#          Adminer  http://<このマシンのIP>:8082   （データベースの中身をブラウザで見る）
+
+name: local-iot
+
+services:
+  # MQTTブローカ（基礎編で Node-RED の中にあった Aedes の代わり）
+  mosquitto:
+    image: eclipse-mosquitto:2
+    restart: unless-stopped
+    ports:
+      - "${MQTT_PORT:-1883}:1883"
+    volumes:
+      - ./mosquitto/config:/mosquitto/config:ro
+      - mosquitto-data:/mosquitto/data
+
+  # データベース（基礎編の Firebase Realtime Database の代わり）
+  mariadb:
+    image: mariadb:11.8
+    restart: unless-stopped
+    command: --event-scheduler=ON
+    environment:
+      MARIADB_ROOT_PASSWORD: ${DB_ROOT_PASSWORD:?.envにDB_ROOT_PASSWORDを書いてください}
+      MARIADB_DATABASE: iot
+      # 初期化スクリプト（mariadb/init/02_users.sh）が使う
+      DB_WRITER_PASSWORD: ${DB_WRITER_PASSWORD:?.envにDB_WRITER_PASSWORDを書いてください}
+      DB_READER_PASSWORD: ${DB_READER_PASSWORD:?.envにDB_READER_PASSWORDを書いてください}
+    ports:
+      - "${DB_PORT:-3306}:3306"
+    volumes:
+      - mariadb-data:/var/lib/mysql
+      - ./mariadb/init:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD", "healthcheck.sh", "--connect", "--innodb_initialized"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  # 可視化とアラート（基礎編の Firebase Hosting の Webアプリの代わり）
+  grafana:
+    image: grafana/grafana:13.3.1
+    restart: unless-stopped
+    depends_on:
+      mariadb:
+        condition: service_healthy
+    environment:
+      GF_SECURITY_ADMIN_USER: admin
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:?.envにGRAFANA_ADMIN_PASSWORDを書いてください}
+      GF_USERS_DEFAULT_LANGUAGE: ja-JP
+      GF_USERS_ALLOW_SIGN_UP: "false"
+      # プロビジョニング（grafana/provisioning）が使う
+      DB_READER_PASSWORD: ${DB_READER_PASSWORD}
+      ALERT_WEBHOOK_URL: ${ALERT_WEBHOOK_URL:-http://host.docker.internal:1880/grafana-alert}
+    ports:
+      - "${GRAFANA_PORT:-3000}:3000"
+    extra_hosts:
+      # コンテナの中から，このマシン自身（Node-RED など）を host.docker.internal で呼べるようにする
+      - "host.docker.internal:host-gateway"
+    volumes:
+      - grafana-data:/var/lib/grafana
+      - ./grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./grafana/dashboards:/etc/grafana/dashboards:ro
+
+  # データベースの中身をブラウザで見る道具（演習用．本番では止めてもよい）
+  adminer:
+    image: adminer:latest
+    restart: unless-stopped
+    environment:
+      ADMINER_DEFAULT_SERVER: mariadb
+    ports:
+      - "${ADMINER_PORT:-8082}:8080"
+
+volumes:
+  mosquitto-data:
+  mariadb-data:
+  grafana-data:
