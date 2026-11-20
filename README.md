@@ -92,6 +92,7 @@
 |`node-red/s05_mariadb.json`|MQTT で届いたデータを MariaDB に保存する|s05|
 |`node-red/s07_alert_led.json`|Grafana のアラートを受けて LED を点滅させる|s07|
 |`sql/exercises.sql`|SQL の演習問題と解答例|s05|
+|`worksheet/design_sheet.png`，`.pdf`|設計ワークの設計シート（Miro用の画像，印刷用PDF）|s10|
 
 ## 動作環境（2026年度）
 
